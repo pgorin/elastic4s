@@ -4,10 +4,12 @@
             "singer.weight": {
                 "mode": "sum",
                 "order": "desc",
-                "nested_filter": {
-                    "term": {
-                        "singer.name": {
-                            "value": "coldplay"
+                "nested": {
+                    "filter": {
+                        "term": {
+                            "singer.name": {
+                                "value": "coldplay"
+                            }
                         }
                     }
                 }

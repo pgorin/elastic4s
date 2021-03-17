@@ -2,6 +2,7 @@ package com.sksamuel.elastic4s.requests.mappings
 
 import com.sksamuel.elastic4s.json.{XContentBuilder, XContentFactory}
 
+//@deprecated("deprecated in favour of ElasticField", "7.6.2")
 object CommonFieldBuilder {
 
   def apply(field: FieldDefinition): XContentBuilder = {
@@ -48,6 +49,7 @@ object CommonFieldBuilder {
   }
 }
 
+//@deprecated("deprecated in favour of ElasticField", "7.6.2")
 object FieldBuilderFn {
 
   def apply(field: FieldDefinition): XContentBuilder = {
@@ -137,6 +139,9 @@ object FieldBuilderFn {
         keyword.similarity.foreach(builder.field("similarity", _))
         keyword.indexOptions.foreach(builder.field("index_options", _))
 
+      case wildcard: WildcardField =>
+        wildcard.ignoreAbove.foreach(builder.field("ignore_above", _))
+
       case range: RangeField =>
         range.ignoreAbove.foreach(builder.field("ignore_above", _))
         range.ignoreMalformed.foreach(builder.field("ignore_malformed", _))
@@ -145,6 +150,8 @@ object FieldBuilderFn {
         range.coerce.foreach(builder.field("coerce", _))
         range.format.foreach(builder.field("format", _))
         range.similarity.foreach(builder.field("similarity", _))
+      case denseVector: DenseVectorField =>
+        builder.field("dims", denseVector.dims)
     }
     builder.endObject()
     builder

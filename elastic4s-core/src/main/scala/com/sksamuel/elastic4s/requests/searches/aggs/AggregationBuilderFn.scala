@@ -2,13 +2,15 @@ package com.sksamuel.elastic4s.requests.searches.aggs
 
 import com.sksamuel.elastic4s.json.{XContentBuilder, XContentFactory}
 import com.sksamuel.elastic4s.requests.searches.DateHistogramInterval
+import com.sksamuel.elastic4s.requests.searches.aggs.builders.{AutoDateHistogramAggregationBuilder, AvgAggregationBuilder, CardinalityAggregationBuilder, ChildrenAggregationBuilder, CompositeAggregationBuilder, DateHistogramAggregationBuilder, DateRangeAggregationBuilder, ExtendedStatsAggregationBuilder, FilterAggregationBuilder, FiltersAggregationBuilder, GeoBoundsAggregationBuilder, GeoCentroidAggregationBuilder, GeoDistanceAggregationBuilder, GeoHashGridAggregationBuilder, GeoTileGridAggregationBuilder, GlobalAggregationBuilder, HistogramAggregationBuilder, IpRangeAggregationBuilder, KeyedFiltersAggregationBuilder, MaxAggregationBuilder, MinAggregationBuilder, MissingAggregationBuilder, NestedAggregationBuilder, PercentilesAggregationBuilder, RangeAggregationBuilder, ReverseNestedAggregationBuilder, SamplerAggregationBuilder, ScriptedMetricAggregationBuilder, SigTermsAggregationBuilder, SigTextAggregationBuilder, StatsAggregationBuilder, SumAggregationBuilder, TermsAggregationBuilder, TopHitsAggregationBuilder, TopMetricsAggregationBuilder, ValueCountAggregationBuilder, WeightedAvgAggregationBuilder}
 import com.sksamuel.elastic4s.requests.searches.aggs.pipeline._
 
 object AggregationBuilderFn {
   def apply(agg: AbstractAggregation): XContentBuilder = {
     val builder = agg match {
 
-      case agg: AvgAggregation            => AvgAggregationBuilder(agg)
+      case agg: AutoDateHistogramAggregation => AutoDateHistogramAggregationBuilder(agg)
+      case agg: AvgAggregation => AvgAggregationBuilder(agg)
       case agg: CardinalityAggregation    => CardinalityAggregationBuilder(agg)
       case agg: ChildrenAggregation       => ChildrenAggregationBuilder(agg)
       case agg: CompositeAggregation      => CompositeAggregationBuilder(agg)
@@ -21,6 +23,7 @@ object AggregationBuilderFn {
       case agg: GeoBoundsAggregation      => GeoBoundsAggregationBuilder(agg)
       case agg: GeoDistanceAggregation    => GeoDistanceAggregationBuilder(agg)
       case agg: GeoHashGridAggregation    => GeoHashGridAggregationBuilder(agg)
+      case agg: GeoTileGridAggregation    => GeoTileGridAggregationBuilder(agg)
       case agg: GlobalAggregation         => GlobalAggregationBuilder(agg)
       case agg: HistogramAggregation      => HistogramAggregationBuilder(agg)
       case agg: IpRangeAggregation        => IpRangeAggregationBuilder(agg)
@@ -36,12 +39,13 @@ object AggregationBuilderFn {
       case agg: SigTextAggregation        => SigTextAggregationBuilder(agg)
       case agg: StatsAggregation          => StatsAggregationBuilder(agg)
       case agg: SumAggregation            => SumAggregationBuilder(agg)
-      case agg: TopHitsAggregation        => TopHitsAggregationBuilder(agg)
       case agg: TermsAggregation          => TermsAggregationBuilder(agg)
-      case agg: ValueCountAggregation     => ValueCountAggregationBuilder(agg)
-
+      case agg: TopHitsAggregation        => TopHitsAggregationBuilder(agg)
+      case agg: TopMetricsAggregation => TopMetricsAggregationBuilder(agg)
+      case agg: ValueCountAggregation => ValueCountAggregationBuilder(agg)
       case agg: RangeAggregation     => RangeAggregationBuilder(agg)
       case agg: DateRangeAggregation => DateRangeAggregationBuilder(agg)
+      case agg: WeightedAvgAggregation => WeightedAvgAggregationBuilder(agg)
 
       // pipeline aggs
       case agg: AvgBucketPipelineAgg           => AvgBucketPipelineAggBuilder(agg)
@@ -49,6 +53,7 @@ object AggregationBuilderFn {
       case agg: BucketSelectorPipelineAgg      => BucketSelectorPipelineBuilder(agg)
       case agg: BucketSortPipelineAgg          => BucketSortPipelineAggBuilder(agg)
       case agg: CumulativeSumPipelineAgg       => CumulativeSumPipelineAggBuilder(agg)
+      case agg: CumulativeCardinalityPipelineAgg => CumulativeCardinalityPipelineAggBuilder(agg)
       case agg: DerivativePipelineAgg          => DerivativePipelineAggBuilder(agg)
       case agg: DiffPipelineAgg                => SerialDiffPipelineAggBuilder(agg)
       case agg: ExtendedStatsBucketPipelineAgg => ExtendedStatsBucketPipelineAggBuilder(agg)
@@ -85,6 +90,17 @@ object DerivativePipelineAggBuilder {
 object CumulativeSumPipelineAggBuilder {
   def apply(agg: CumulativeSumPipelineAgg): XContentBuilder = {
     val builder = XContentFactory.jsonBuilder().startObject("cumulative_sum")
+    builder.field("buckets_path", agg.bucketsPath)
+    agg.format.foreach(f => builder.field("format", f))
+    builder.endObject()
+    AggMetaDataFn(agg, builder)
+    builder.endObject()
+  }
+}
+
+object CumulativeCardinalityPipelineAggBuilder {
+  def apply(agg: CumulativeCardinalityPipelineAgg): XContentBuilder = {
+    val builder = XContentFactory.jsonBuilder().startObject("cumulative_cardinality")
     builder.field("buckets_path", agg.bucketsPath)
     agg.format.foreach(f => builder.field("format", f))
     builder.endObject()

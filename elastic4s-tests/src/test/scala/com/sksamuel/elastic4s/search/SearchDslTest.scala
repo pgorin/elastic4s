@@ -1,17 +1,19 @@
 package com.sksamuel.elastic4s.search
 
+import java.util.TimeZone
+
 import com.sksamuel.elastic4s._
 import com.sksamuel.elastic4s.requests.analyzers.{FrenchLanguageAnalyzer, SnowballAnalyzer, WhitespaceAnalyzer}
 import com.sksamuel.elastic4s.requests.common.{DistanceUnit, FetchSourceContext, ValueType}
 import com.sksamuel.elastic4s.requests.searches._
 import com.sksamuel.elastic4s.requests.searches.aggs.{SubAggCollectionMode, TermsOrder}
+import com.sksamuel.elastic4s.requests.searches.queries.RankFeatureQuery.Sigmoid
 import com.sksamuel.elastic4s.requests.searches.queries.funcscorer.MultiValueMode
 import com.sksamuel.elastic4s.requests.searches.queries.geo.GeoDistance
 import com.sksamuel.elastic4s.requests.searches.queries.matches.{MultiMatchQueryBuilderType, ZeroTermsQuery}
-import com.sksamuel.elastic4s.requests.searches.queries.{RegexpFlag, SimpleQueryStringFlag}
+import com.sksamuel.elastic4s.requests.searches.queries.{AllOf, AnyOf, IntervalsQuery, Match, RegexpFlag, SimpleQueryStringFlag}
 import com.sksamuel.elastic4s.requests.searches.sort.{SortMode, SortOrder}
 import com.sksamuel.elastic4s.requests.searches.suggestion.{DirectGenerator, Fuzziness, SuggestMode}
-import org.joda.time.DateTimeZone
 import org.scalatest.OneInstancePerTest
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatestplus.mockito.MockitoSugar
@@ -83,6 +85,33 @@ class SearchDslTest extends AnyFlatSpec with MockitoSugar with JsonSugar with On
       rangeQuery("coldplay") gte 4 lt 10 boost 1.2
     }
     req.request.entity.get.get should matchJsonResource("/json/search/search_range.json")
+  }
+
+  it should "generate json for a distance feature query" in {
+    val req = search("*") limit 5 query {
+      distanceFeatureQuery("production_date", origin = "now", pivot = "7d").boost(0.5)
+    }
+    req.request.entity.get.get should matchJsonResource("/json/search/search_distance_feature.json")
+  }
+
+  it should "generate json for a rank feature query" in {
+    val req = search("*") limit 5 query {
+      rankFeatureQuery("pagerank").boost(0.5).withSigmoid(Sigmoid(7, 0.6))
+    }
+    req.request.entity.get.get should matchJsonResource("/json/search/search_rank_feature.json")
+  }
+
+  it should "generate json for an intervals query" in {
+    val req = search("*") limit 5 query {
+      IntervalsQuery("my_text", AllOf(List(
+        Match(query = "my favorite food").maxGaps(0).ordered(true),
+        AnyOf(intervals = List(
+          Match(query = "hot water"),
+          Match(query = "cold porridge")
+        ))
+      )).ordered(true))
+    }
+    req.request.entity.get.get should matchJsonResource("/json/search/search_intervals.json")
   }
 
   it should "generate json for a wildcard query" in {
@@ -393,15 +422,19 @@ class SearchDslTest extends AnyFlatSpec with MockitoSugar with JsonSugar with On
 
   it should "generate json for field sort" in {
     val req = search("music") sortBy {
-      fieldSort("singer") missing "no-singer" order SortOrder.Desc mode SortMode.Avg nestedPath "nest"
+      fieldSort("singer") missing "no-singer" order SortOrder.Desc mode SortMode.Avg nested {
+        nestedSort() path "nest"
+      }
     }
     req.request.entity.get.get should matchJsonResource("/json/search/search_sort_field.json")
   }
 
   it should "generate json for nested field sort" in {
     val req = search("music") sortBy {
-      fieldSort("singer.weight") order SortOrder.Desc mode SortMode.Sum nestedFilter {
-        termQuery("singer.name", "coldplay")
+      fieldSort("singer.weight") order SortOrder.Desc mode SortMode.Sum nested {
+        nestedSort() filter {
+          termQuery("singer.name", "coldplay")
+        }
       }
     }
     req.request.entity.get.get should matchJsonResource("/json/search/search_sort_nested_field.json")
@@ -417,7 +450,7 @@ class SearchDslTest extends AnyFlatSpec with MockitoSugar with JsonSugar with On
   it should "generate correct json for script sort" in {
     val req = search("music") sortBy {
       scriptSort(script("document.score").lang("java")) typed "number" order SortOrder
-        .DESC nestedPath "a.b.c" sortMode "min"
+        .DESC nested { nestedSort() path "a.b.c" } sortMode "min"
     }
     req.request.entity.get.get should matchJsonResource("/json/search/search_sort_script.json")
   }
@@ -604,7 +637,7 @@ class SearchDslTest extends AnyFlatSpec with MockitoSugar with JsonSugar with On
 
   it should "generate correct json for datehistogram aggregation" in {
     val req = search("music") aggs {
-      dateHistogramAggregation("years") field "date" interval DateHistogramInterval.Year minDocCount 0
+      dateHistogramAggregation("years").field("date").fixedInterval(DateHistogramInterval.Year).minDocCount(0)
     }
     req.request.entity.get.get should matchJsonResource("/json/search/search_aggregations_datehistogram.json")
   }
@@ -618,7 +651,7 @@ class SearchDslTest extends AnyFlatSpec with MockitoSugar with JsonSugar with On
 
   it should "generate correct json for date range aggregation" in {
     val req = search("music") aggs {
-      dateRangeAgg("daterange_agg", "date").range("now-1Y", "now").unboundedFrom(ElasticDate("now-3m")).missing("wibble").timeZone(DateTimeZone.UTC)
+      dateRangeAgg("daterange_agg", "date").range("now-1Y", "now").unboundedFrom(ElasticDate("now-3m")).missing("wibble").timeZone(TimeZone.getTimeZone("UTC"))
     }
     req.request.entity.get.get should matchJsonResource("/json/search/search_aggregations_daterange.json")
   }

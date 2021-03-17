@@ -1,40 +1,49 @@
-
-val isTravis = settingKey[Boolean]("Flag indicating whether the current build is running under Travis")
-isTravis in Global := sys.env.get("TRAVIS").isDefined
-
-val travisBuildNumber = settingKey[String]("Value of the travis build number")
-travisBuildNumber in Global := sys.env.getOrElse("TRAVIS_BUILD_NUMBER", "0")
-
 val org                    = "com.sksamuel.elastic4s"
-val AkkaVersion            = "2.6.4"
-val AkkaHttpVersion        = "10.1.11"
+val AkkaVersion            = "2.6.13"
+val AkkaHttpVersion        = "10.2.3"
 val CatsVersion            = "2.0.0"
-val CatsEffectVersion      = "2.1.3"
+val CatsEffectVersion      = "2.3.3"
 val CirceVersion           = "0.13.0"
-val CommonsIoVersion       = "2.6"
-val ElasticsearchVersion   = "7.6.2"
+val CommonsIoVersion       = "2.8.0"
+val ElasticsearchVersion   = "7.11.2"
 val ExtsVersion            = "1.61.1"
-val JacksonVersion         = "2.10.3"
-val Json4sVersion          = "3.6.7"
-val AWSJavaSdkVersion      = "2.7.1"
-val Log4jVersion           = "2.13.1"
-val MockitoVersion         = "3.3.3"
+val JacksonVersion         = "2.12.2"
+val Json4sVersion          = "3.6.11"
+val Log4jVersion           = "2.14.0"
+val MockitoVersion         = "3.8.0"
 val MonixVersion           = "3.1.0"
-val PlayJsonVersion        = "2.8.1"
+val PlayJsonVersion        = "2.9.2"
 val ReactiveStreamsVersion = "1.0.3"
-val ScalatestVersion       = "3.1.1"
-val ScalatestPlusVersion   = "3.1.1.0"
-val ScalamockVersion       = "4.4.0"
-val ScalazVersion          = "7.2.30"
-val ZIOVersion             = "1.0.0-RC18-2"
-val SprayJsonVersion       = "1.3.5"
+val ScalatestVersion       = "3.2.6"
+val ScalatestPlusVersion   = "3.1.2.0"
+val ScalamockVersion       = "5.1.0"
+val ScalazVersion          = "7.2.31"
+val ZIOVersion             = "1.0.5"
+val SprayJsonVersion       = "1.3.6"
 val SttpVersion            = "1.7.2"
 val Slf4jVersion           = "1.7.30"
 val ScalatestPlusMockitoArtifactId = "mockito-3-2"
 
+def isGithubActions = sys.env.getOrElse("CI", "false") == "true"
+
+// set by github actions when executing a release build
+def releaseVersion = sys.env.getOrElse("RELEASE_VERSION", "")
+def isRelease = releaseVersion != ""
+
+// the version to use to publish - either from release version or a snapshot run number
+def publishVersion = if (isRelease) releaseVersion else "7.10.0." + githubRunNumber + "-SNAPSHOT"
+
+// set by github actions and used as the snapshot build number
+def githubRunNumber = sys.env.getOrElse("GITHUB_RUN_NUMBER", "local")
+
+// creds for release to maven central
+def ossrhUsername = sys.env.getOrElse("OSSRH_USERNAME", "")
+def ossrhPassword = sys.env.getOrElse("OSSRH_PASSWORD", "")
+
+
 lazy val commonScalaVersionSettings = Seq(
-  scalaVersion := "2.12.11",
-  crossScalaVersions := Seq("2.12.11", "2.13.1")
+  scalaVersion := "2.12.12",
+  crossScalaVersions := Seq("2.12.12", "2.13.5")
 )
 
 lazy val warnUnusedImport = Seq(
@@ -47,7 +56,7 @@ lazy val warnUnusedImport = Seq(
 
 lazy val commonSettings = Seq(
   organization := "com.sksamuel.elastic4s",
-  version := (if (isTravis.value) version.value + s".$travisBuildNumber-SNAPSHOT" else version.value),
+  version := publishVersion,
   resolvers ++= Seq(Resolver.mavenLocal),
   parallelExecution in Test := false,
   scalacOptions in(Compile, doc) := (scalacOptions in(Compile, doc)).value.filter(_ != "-Xfatal-warnings"),
@@ -62,16 +71,16 @@ lazy val publishSettings = Seq(
   releasePublishArtifactsAction := PgpKeys.publishSigned.value,
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
-    if (isTravis.value)
-      Some("snapshots" at nexus + "content/repositories/snapshots")
-    else
+    if (isRelease)
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
+    else
+      Some("snapshots" at nexus + "content/repositories/snapshots")
   }
 )
 
 lazy val commonJvmSettings = Seq(
   testOptions in Test += {
-    val flag = if ((isTravis in Global).value) "-oCI" else "-oDF"
+    val flag = if (isGithubActions) "-oCI" else "-oDF"
     Tests.Argument(TestFrameworks.ScalaTest, flag)
   },
   Test / fork := true,
@@ -104,17 +113,13 @@ lazy val pomSettings = Seq(
   </developers>
 )
 
-val travisCreds = Credentials(
-  "Sonatype Nexus Repository Manager",
-  "oss.sonatype.org",
-  sys.env.getOrElse("OSSRH_USERNAME", ""),
-  sys.env.getOrElse("OSSRH_PASSWORD", "")
-)
-
-val localCreds = Credentials(Path.userHome / ".sbt" / "credentials.sbt")
-
 lazy val credentialSettings = Seq(
-  credentials := (if (isTravis.value) Seq(travisCreds) else Seq(localCreds))
+  credentials := Seq(Credentials(
+    "Sonatype Nexus Repository Manager",
+    "oss.sonatype.org",
+    sys.env.getOrElse("OSSRH_USERNAME", ""),
+    sys.env.getOrElse("OSSRH_PASSWORD", "")
+  ))
 )
 
 lazy val noPublishSettings = Seq(
@@ -165,7 +170,6 @@ lazy val core = (project in file("elastic4s-core"))
   .settings(allSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "joda-time" % "joda-time" % "2.10.3",
       "com.fasterxml.jackson.core" % "jackson-core" % JacksonVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % JacksonVersion,
       "com.fasterxml.jackson.module" %% "jackson-module-scala" % JacksonVersion
@@ -274,8 +278,7 @@ lazy val jackson = (project in file("elastic4s-json-jackson"))
   .settings(
     libraryDependencies += "com.fasterxml.jackson.core" % "jackson-core" % JacksonVersion,
     libraryDependencies += "com.fasterxml.jackson.core" % "jackson-databind" % JacksonVersion,
-    libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % JacksonVersion exclude("org.scala-lang", "scala-library"),
-    libraryDependencies += "com.fasterxml.jackson.datatype" % "jackson-datatype-joda" % JacksonVersion
+    libraryDependencies += "com.fasterxml.jackson.module" %% "jackson-module-scala" % JacksonVersion exclude("org.scala-lang", "scala-library")
   )
 
 lazy val circe = (project in file("elastic4s-json-circe"))

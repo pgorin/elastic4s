@@ -1,16 +1,15 @@
 package com.sksamuel.elastic4s.requests
 
-import com.sksamuel.elastic4s.requests.mappings.{BasicField, CompletionField, GeoshapeField, JoinField, KeywordField, NestedField, ObjectField, RangeField, SearchAsYouTypeField, TextField}
+import com.sksamuel.elastic4s.requests.mappings._
 import com.sksamuel.elastic4s.requests.script.{Script, ScriptField}
 
 trait TypesApi {
 
-  // string datatypes
   def keywordField(name: String): KeywordField            = KeywordField(name)
   def textField(name: String): TextField                  = TextField(name)
+  def wildcardField(name: String): WildcardField          = WildcardField(name)
   def searchAsYouType(name: String): SearchAsYouTypeField = SearchAsYouTypeField(name)
 
-  // numeric datatypes
   def byteField(name: String): BasicField        = BasicField(name, "byte")
   def doubleField(name: String): BasicField      = BasicField(name, "double")
   def floatField(name: String): BasicField       = BasicField(name, "float")
@@ -20,16 +19,12 @@ trait TypesApi {
   def scaledFloatField(name: String): BasicField = BasicField(name, "scaled_float")
   def shortField(name: String): BasicField       = BasicField(name, "short")
 
-  // booleans
   def booleanField(name: String): BasicField = BasicField(name, "boolean")
 
-  // binaries
   def binaryField(name: String): BasicField = BasicField(name, "binary")
 
-  // dates
   def dateField(name: String): BasicField = BasicField(name, "date")
 
-  // geo
   def geopointField(name: String): BasicField    = BasicField(name, "geo_point")
   def geoshapeField(name: String): GeoshapeField = GeoshapeField(name)
 
@@ -54,11 +49,17 @@ trait TypesApi {
   def percolatorField(name: String): BasicField      = BasicField(name, "percolator")
   def joinField(name: String): JoinField             = JoinField(name)
 
+  def denseVectorField(name: String, dims: Int): DenseVectorField = DenseVectorField(name, dims)
+
   def scriptField(name: String, script: String): ScriptField = ScriptField(name, script)
   def scriptField(name: String, script: Script): ScriptField = ScriptField(name, script)
+
+  @deprecated("use scriptField(name script)")
   def scriptField(name: String): ExpectsScript               = ExpectsScript(name)
   case class ExpectsScript(name: String) {
+    @deprecated("use scriptField(name script)")
     def script(script: String): ScriptField = ScriptField(name, script)
+    @deprecated("use scriptField(name script)")
     def script(script: Script): ScriptField = ScriptField(name, script)
   }
 }

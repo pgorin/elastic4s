@@ -88,7 +88,7 @@ trait ElasticSugar extends ElasticDsl {
     blockUntil(s"Expected to find document $id") { () =>
       client
         .execute {
-          get(id).from(index)
+          get(index, id)
         }
         .await
         .result
@@ -140,12 +140,12 @@ trait ElasticSugar extends ElasticDsl {
     }
 
   def blockUntilIndexExists(index: String): Unit =
-    blockUntil(s"Expected exists index $index") { () ⇒
+    blockUntil(s"Expected exists index $index") { () =>
       doesIndexExists(index)
     }
 
   def blockUntilIndexNotExists(index: String): Unit =
-    blockUntil(s"Expected not exists index $index") { () ⇒
+    blockUntil(s"Expected not exists index $index") { () =>
       !doesIndexExists(index)
     }
 

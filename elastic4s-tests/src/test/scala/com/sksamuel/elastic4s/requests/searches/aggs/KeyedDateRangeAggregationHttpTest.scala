@@ -1,10 +1,11 @@
 package com.sksamuel.elastic4s.requests.searches.aggs
 
-import com.sksamuel.elastic4s.requests.searches.DateRangeBucket
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
+import com.sksamuel.elastic4s.requests.searches.aggs.responses.bucket.DateRangeBucket
 import com.sksamuel.elastic4s.testkit.DockerTests
-import com.sksamuel.elastic4s.{ElasticDate, ElasticDateMath, Years}
-import org.joda.time.DateTime
-import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
+import com.sksamuel.elastic4s.{ElasticDate, ElasticDateMath}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -27,45 +28,16 @@ class KeyedDateRangeAggregationHttpTest extends AnyFreeSpec with DockerTests wit
     )
   }.await
 
-  val dateFormatter: DateTimeFormatter = DateTimeFormat.forPattern("dd/MM/yyyy")
+  val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
   client.execute(
     bulk(
-      indexInto("daterangeaggs").fields("name" -> "Breaking Bad",
-        "premiere_date" -> DateTime
-          .now()
-          .minusYears(10)
-          .toString(dateFormatter)),
-      indexInto("daterangeaggs").fields("name" -> "Better Call Saul",
-        "premiere_date" -> DateTime
-          .now()
-          .minusYears(5)
-          .minusMonths(1)
-          .toString(dateFormatter)),
-      indexInto("daterangeaggs").fields("name" -> "Star Trek Discovery",
-        "premiere_date" -> DateTime
-          .now()
-          .minusYears(2)
-          .minusMonths(6)
-          .toString(dateFormatter)),
-      indexInto("daterangeaggs").fields("name" -> "Game of Thrones",
-        "premiere_date" -> DateTime
-          .now()
-          .minusYears(9)
-          .minusMonths(6)
-          .toString(dateFormatter)),
-      indexInto("daterangeaggs").fields("name" -> "Designated Survivor",
-        "premiere_date" -> DateTime
-          .now()
-          .minusYears(3)
-          .minusMonths(1)
-          .toString(dateFormatter)),
-      indexInto("daterangeaggs").fields("name" -> "Walking Dead",
-        "premiere_date" -> DateTime
-          .now()
-          .minusYears(8)
-          .minusMonths(3)
-          .toString(dateFormatter))
+      indexInto("daterangeaggs").fields("name" -> "Star Trek Picard", "premiere_date" -> LocalDate.of(2020, 1, 23).format(dateFormatter)),
+      indexInto("daterangeaggs").fields("name" -> "Better Call Saul", "premiere_date" -> LocalDate.of(2015, 2, 8).format(dateFormatter)),
+      indexInto("daterangeaggs").fields("name" -> "Star Trek Discovery", "premiere_date" -> LocalDate.of(2017, 9, 19).format(dateFormatter)),
+      indexInto("daterangeaggs").fields("name" -> "Game of Thrones", "premiere_date" -> LocalDate.of(2011, 4, 17).format(dateFormatter)),
+      indexInto("daterangeaggs").fields("name" -> "Designated Survivor", "premiere_date" -> LocalDate.of(2016, 9, 21).format(dateFormatter)),
+      indexInto("daterangeaggs").fields("name" -> "Walking Dead", "premiere_date" -> LocalDate.of(2011, 10, 31).format(dateFormatter))
     ).refreshImmediately
   ).await
 
@@ -75,8 +47,8 @@ class KeyedDateRangeAggregationHttpTest extends AnyFreeSpec with DockerTests wit
       val resp = client.execute {
         search("daterangeaggs").matchAllQuery().aggs {
           dateRangeAgg("agg1", "premiere_date")
-            .range("old", ElasticDateMath("15/12/2017").minus(10, Years), ElasticDate("15/12/2017").minus(5, Years))
-            .range("new", ElasticDateMath("15/12/2017").minus(5, Years), ElasticDate("15/12/2017"))
+            .range("old", ElasticDateMath("15/12/2010"), ElasticDate("15/12/2015"))
+            .range("new", ElasticDateMath("15/12/2015"), ElasticDate("15/12/2020"))
             .keyed(true)
         }
       }.await.result
@@ -85,8 +57,8 @@ class KeyedDateRangeAggregationHttpTest extends AnyFreeSpec with DockerTests wit
 
       val agg = resp.aggs.keyedDateRange("agg1")
       agg.buckets.mapValues(_.copy(data = Map.empty)).toMap shouldBe Map(
-        "old" -> DateRangeBucket(Some("1.1976768E12"), Some("15/12/2007"), Some("1.3555296E12"), Some("15/12/2012"), None, 3, Map.empty),
-        "new" -> DateRangeBucket(Some("1.3555296E12"), Some("15/12/2012"), Some("1.513296E12"), Some("15/12/2017"), None, 3, Map.empty)
+        "old" -> DateRangeBucket(Some("1.2923712E12"), Some("15/12/2010"), Some("1.4501376E12"), Some("15/12/2015"), None, 3, Map.empty),
+        "new" -> DateRangeBucket(Some("1.4501376E12"), Some("15/12/2015"), Some("1.6079904E12"), Some("15/12/2020"), None, 3, Map.empty)
       )
     }
     "should support string dates" in {
@@ -94,8 +66,8 @@ class KeyedDateRangeAggregationHttpTest extends AnyFreeSpec with DockerTests wit
       val resp = client.execute {
         search("daterangeaggs").matchAllQuery().aggs {
           dateRangeAgg("agg1", "premiere_date")
-            .range("old", "15/12/2017||-10y", "15/12/2017||-5y")
-            .range("new", "15/12/2017||-5y", "15/12/2017||")
+            .range("old", "15/12/2010", "15/12/2015")
+            .range("new", "15/12/2015", "15/12/2020")
             .keyed(true)
         }
       }.await.result
@@ -104,8 +76,8 @@ class KeyedDateRangeAggregationHttpTest extends AnyFreeSpec with DockerTests wit
 
       val agg = resp.aggs.keyedDateRange("agg1")
       agg.buckets.mapValues(_.copy(data = Map.empty)).toMap shouldBe Map(
-        "old" -> DateRangeBucket(Some("1.1976768E12"), Some("15/12/2007"), Some("1.3555296E12"), Some("15/12/2012"), None, 3, Map.empty),
-        "new" -> DateRangeBucket(Some("1.3555296E12"), Some("15/12/2012"), Some("1.513296E12"), Some("15/12/2017"), None, 3, Map.empty)
+        "old" -> DateRangeBucket(Some("1.2923712E12"), Some("15/12/2010"), Some("1.4501376E12"), Some("15/12/2015"), None, 3, Map.empty),
+        "new" -> DateRangeBucket(Some("1.4501376E12"), Some("15/12/2015"), Some("1.6079904E12"), Some("15/12/2020"), None, 3, Map.empty)
       )
     }
   }
